@@ -104,3 +104,66 @@ def test_garbage_pdf_marks_failed(qapp, tab, tmp_path):
     tab._on_converted(tmp_path / "orig.png", bad, tab.setup)
     assert tab.grid.count() == 0
     assert "Failed" in tab.status.item(0).text()
+
+
+# ---------- Quick convert ----------
+
+from fileconverter import convert_tab as convert_tab_module  # noqa: E402
+from fileconverter.office import find_soffice  # noqa: E402
+
+
+@pytest.fixture
+def save_dialog(monkeypatch):
+    """Fake Save As dialog: records the suggested path, answers with `answer` (None = cancel)."""
+    state = {"suggested": None, "answer": None}
+
+    def fake(parent, caption, suggested, filter_):
+        state["suggested"] = suggested
+        return (str(state["answer"]) if state["answer"] else "", "")
+
+    monkeypatch.setattr(convert_tab_module.QFileDialog, "getSaveFileName", fake)
+    return state
+
+
+def test_quick_convert_image_saves_same_name_pdf(qapp, tab, tall_png, tmp_path, save_dialog):
+    target = tmp_path / "out" / "tall.pdf"
+    target.parent.mkdir()
+    save_dialog["answer"] = target
+    tab.quick_convert(tall_png)
+    assert not tab.quick_btn.isEnabled()  # busy while converting
+    settle(qapp)
+    assert save_dialog["suggested"] == str(tall_png.with_suffix(".pdf"))
+    assert len(pypdf.PdfReader(target).pages) == 1
+    assert tab.grid.count() == 0  # grid untouched
+    assert "Saved to" in tab.status.item(0).text()
+    assert tab.quick_btn.isEnabled()
+
+
+def test_quick_convert_cancel_writes_nothing(qapp, tab, tall_png, save_dialog):
+    tab.quick_convert(tall_png)
+    settle(qapp)
+    assert not tall_png.with_suffix(".pdf").exists()
+    assert "Cancelled" in tab.status.item(0).text()
+    assert tab.quick_btn.isEnabled()
+
+
+def test_quick_convert_failure_warns_and_reenables(qapp, tab, tmp_path, save_dialog, monkeypatch):
+    bad = tmp_path / "broken.png"
+    bad.write_bytes(b"not an image")
+    warned = []
+    monkeypatch.setattr(convert_tab_module.QMessageBox, "warning", lambda *a: warned.append(a[2]))
+    tab.quick_convert(bad)
+    settle(qapp)
+    assert save_dialog["suggested"] is None  # no Save As after a failure
+    assert "Failed" in tab.status.item(0).text()
+    assert warned and "broken.png" in warned[0]
+    assert tab.quick_btn.isEnabled()
+
+
+@pytest.mark.skipif(find_soffice() is None, reason="LibreOffice not installed")
+def test_quick_convert_docx(qapp, tab, sample_docx, tmp_path, save_dialog):
+    save_dialog["answer"] = tmp_path / "sample.pdf"
+    tab.quick_convert(sample_docx)
+    settle(qapp)
+    assert save_dialog["suggested"] == str(sample_docx.with_suffix(".pdf"))
+    assert len(pypdf.PdfReader(tmp_path / "sample.pdf").pages) >= 1

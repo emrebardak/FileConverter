@@ -182,6 +182,12 @@ Main window with two tabs.
   - Page setup panel: Size combo (A4/Letter/Fit), Orientation combo (Auto/Portrait/Landscape), Margin spin box (0–50 mm).
   - Status list: one row per added file, showing Converting… / Done / Failed: reason.
   - "Save PDF…" button.
+  - "Quick convert…" button, next to "Add files…": a one-shot path that skips the grid.
+    1. Pick one supported file.
+    2. It converts in a worker (images use the current page setup). Its status row shows Converting… and the button is disabled until it finishes.
+    3. A Save As dialog opens prefilled with the source's folder and name, with `.pdf` (`C:\Docs\report.docx` → `C:\Docs\report.pdf`).
+    4. The PDF is written with `pages.save` (atomic). The status row shows "Saved to …", or "Cancelled" if the dialog is cancelled.
+    - The grid and preview are not touched. LibreOffice missing, a failed conversion, and a failed save use the same messages as the rest of the tab; a failed conversion also shows a warning dialog.
 - **Right side**
   - Live viewer: `QPdfView` (multi-page, continuous scroll) fed by a `QPdfDocument` that loads from a `QBuffer` holding `pages.to_bytes()`.
   - Zoom −/+ buttons and Fit-width.
