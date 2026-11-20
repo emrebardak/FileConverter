@@ -1,0 +1,54 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add file sample.pptx
+        2. Drag page 3 to position 1
+        3. Click Save PDF
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Office to PDF
+        - Image to PDF
+        - Page grid (merge / reorder / delete)
+        - Live preview
+        - Summarizer
+        - Packaging / .exe
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: v0.1.0 or commit hash
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 23H2
+  - type: input
+    id: libreoffice
+    attributes:
+      label: LibreOffice version (if Office files are involved)
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error message or screenshot
+      description: Do not paste API keys or private documents.
