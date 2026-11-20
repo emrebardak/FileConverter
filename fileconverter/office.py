@@ -76,7 +76,8 @@ def to_pdf(src: Path, workdir: Path, timeout: int = 120) -> Path:
         result = subprocess.run(
             cmd,
             capture_output=True,
-            text=True,
+            encoding="utf-8",  # soffice writes UTF-8, not the ANSI codepage
+            errors="replace",
             timeout=timeout,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
@@ -84,6 +85,6 @@ def to_pdf(src: Path, workdir: Path, timeout: int = 120) -> Path:
         raise ConversionError(f"{src.name}: timed out after {timeout}s") from e
     out = outdir / f"{src.stem}.pdf"
     if result.returncode != 0 or not out.exists():
-        detail = (result.stderr or result.stdout).strip() or "LibreOffice produced no PDF"
+        detail = ((result.stderr or "") + (result.stdout or "")).strip() or "LibreOffice produced no PDF"
         raise ConversionError(f"{src.name}: {detail}")
     return out

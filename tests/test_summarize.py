@@ -1,3 +1,4 @@
+import http.client
 import io
 import json
 import urllib.error
@@ -109,6 +110,8 @@ def test_empty_reply_raises(monkeypatch):
         (http_error(500), s.ApiError),
         (urllib.error.URLError("no route"), s.Offline),
         (TimeoutError(), s.Offline),
+        (ConnectionResetError(), s.Offline),
+        (http.client.RemoteDisconnected("closed"), s.Offline),
     ],
 )
 def test_errors_map_to_types(monkeypatch, error, expected):
@@ -117,6 +120,13 @@ def test_errors_map_to_types(monkeypatch, error, expected):
 
     monkeypatch.setattr(urllib.request, "urlopen", boom)
     with pytest.raises(expected):
+        s.summarize("text", "Short", "key", "m")
+
+
+@pytest.mark.parametrize("payload", [b"<html>oops</html>", b"{}", b'{"choices": []}', b'{"choices": [{}]}', b"[]"])
+def test_malformed_200_maps_to_api_error(monkeypatch, payload):
+    monkeypatch.setattr(urllib.request, "urlopen", lambda r, timeout: io.BytesIO(payload))
+    with pytest.raises(s.ApiError):
         s.summarize("text", "Short", "key", "m")
 
 

@@ -90,9 +90,15 @@ class ConvertTab(QWidget):
         self.margin_box.setRange(0, 50)
         self.margin_box.setSuffix(" mm")
         self.margin_box.setValue(self.setup.margin_mm)
+        self.margin_box.setKeyboardTracking(False)
+        # re-convert 300 ms after the last page-setup change
+        self._setup_timer = QTimer(self)
+        self._setup_timer.setSingleShot(True)
+        self._setup_timer.setInterval(300)
+        self._setup_timer.timeout.connect(self._on_setup_changed)
         for w in (self.size_box, self.orient_box):
-            w.currentTextChanged.connect(self._on_setup_changed)
-        self.margin_box.valueChanged.connect(self._on_setup_changed)
+            w.currentTextChanged.connect(self._setup_timer.start)
+        self.margin_box.valueChanged.connect(self._setup_timer.start)
         setup_form = QFormLayout()
         setup_form.addRow("Image page size", self.size_box)
         setup_form.addRow("Orientation", self.orient_box)
@@ -170,17 +176,26 @@ class ConvertTab(QWidget):
 
     def _convert(self, origin: Path, fn, *args) -> None:
         self._set_status(origin, "Converting…")
+        setup = self.setup  # the setup this conversion starts with
         run_task(
             fn,
             *args,
-            on_done=lambda pdf: self._on_converted(origin, pdf),
+            on_done=lambda pdf: self._on_converted(origin, pdf, setup),
             on_failed=lambda msg: self._set_status(origin, f"Failed: {msg}"),
         )
 
-    def _on_converted(self, origin: Path, pdf: Path) -> None:
+    def _on_converted(self, origin: Path, pdf: Path, setup: PageSetup) -> None:
+        if origin.suffix.lower() in IMAGE_EXTS and setup != self.setup:
+            self._convert(origin, images.to_pdf, origin, self.setup, self.workdir)  # setup changed meanwhile
+            return
+        try:
+            converted = pages.pages_of(pdf, origin)
+        except Exception as e:
+            self._set_status(origin, f"Failed: {e}")
+            return
         color = self._colors.setdefault(origin, TAG_COLORS[len(self._colors) % len(TAG_COLORS)])
         new = []
-        for page in pages.pages_of(pdf, origin):
+        for page in converted:
             pid = next(self._ids)
             self._pages[pid] = page
             item = QListWidgetItem()
@@ -280,6 +295,10 @@ class ConvertTab(QWidget):
         out = Path(name)
         if out.suffix.lower() != ".pdf":
             out = out.with_suffix(".pdf")
+            if out.exists() and QMessageBox.question(
+                self, "Overwrite?", f"{out.name} already exists. Replace it?"
+            ) != QMessageBox.StandardButton.Yes:
+                return
         try:
             pages.save(self.current_pages(), out)
         except Exception as e:

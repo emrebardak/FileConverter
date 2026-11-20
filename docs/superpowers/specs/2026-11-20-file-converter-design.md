@@ -228,11 +228,11 @@ Main window with two tabs.
 | Corrupt image | That file is marked "Failed: cannot read image". |
 | Save fails (locked or read-only target) | Error dialog. Grid and preview are unchanged and the temp file is cleaned up. |
 | Save with empty grid | Save button is disabled. |
-| No text in source | "No text found — scanned PDF? OCR is not supported." |
+| No text in source | "No text found - scanned PDF? OCR is not supported." |
 | No API key | Prompt to enter a key, with a link to build.nvidia.com. |
-| `BadApiKey` | "API key rejected — check it on build.nvidia.com." |
-| `RateLimited` | "Rate limited — wait a minute and try again." |
-| `Offline` | "Cannot reach NVIDIA API — check your internet connection." |
+| `BadApiKey` | "API key rejected - check it on build.nvidia.com." |
+| `RateLimited` | "Rate limited - wait a minute and try again." |
+| `Offline` | "Cannot reach NVIDIA API - check your internet connection." |
 | `ApiError` | Shows the status code and the first 200 characters of the body. |
 
 No error ever stops other files that are in progress. No error discards the user's grid.

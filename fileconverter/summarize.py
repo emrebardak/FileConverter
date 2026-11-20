@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import http.client
 import os
 import re
 import urllib.error
@@ -112,9 +113,15 @@ def _chat(system: str, user: str, api_key: str, model: str) -> str:
         if e.code == 429:
             raise RateLimited("Rate limited - wait a minute and try again.") from e
         raise ApiError(e.code, detail) from e
-    except (urllib.error.URLError, TimeoutError) as e:
+    except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.RemoteDisconnected) as e:
         raise Offline("Cannot reach NVIDIA API - check your internet connection.") from e
-    content = _THINK.sub("", data["choices"][0]["message"].get("content") or "").strip()
+    except json.JSONDecodeError as e:
+        raise ApiError(200, "response was not JSON") from e
+    try:
+        reply = data["choices"][0]["message"].get("content")
+    except (KeyError, IndexError, TypeError, AttributeError) as e:
+        raise ApiError(200, "unexpected response shape") from e
+    content = _THINK.sub("", reply or "").strip()
     if not content:
         raise SummarizeError("The model returned an empty reply - try again or pick another model.")
     return content

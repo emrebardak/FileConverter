@@ -66,5 +66,5 @@ def to_pdf(src: Path, setup: PageSetup, workdir: Path) -> Path:
     page = Image.new("RGB", (page_w, page_h), "white")
     page.paste(im, ((page_w - im.width) // 2, (page_h - im.height) // 2))
     out = workdir / f"{src.stem}-{uuid.uuid4().hex[:8]}.pdf"
-    page.save(out, "PDF", resolution=DPI)
+    page.save(out, "PDF", resolution=DPI, quality=95)
     return out

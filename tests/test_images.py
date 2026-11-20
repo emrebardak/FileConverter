@@ -58,3 +58,20 @@ def test_corrupt_image_raises(tmp_path, workdir):
     bad.write_bytes(b"not an image")
     with pytest.raises(ImageError):
         to_pdf(bad, PageSetup(), workdir)
+
+
+def test_pdf_images_use_high_jpeg_quality(tmp_path, workdir):
+    import io
+
+    import os
+
+    from PIL import Image
+
+    from fileconverter import images
+
+    src = tmp_path / "noise.png"
+    Image.frombytes("RGB", (300, 400), os.urandom(300 * 400 * 3)).save(src)
+    out = images.to_pdf(src, images.PageSetup("Fit", "Auto", 0), workdir)
+    default = io.BytesIO()
+    Image.open(src).convert("RGB").save(default, "PDF", resolution=images.DPI)
+    assert out.stat().st_size > 1.3 * len(default.getvalue())

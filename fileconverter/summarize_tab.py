@@ -159,4 +159,7 @@ class SummarizeTab(QWidget):
     def _save_result(self) -> None:
         name, _ = QFileDialog.getSaveFileName(self, "Save summary", "summary.md", "Markdown (*.md);;Text (*.txt)")
         if name:
-            Path(name).write_text(self.result.toPlainText(), encoding="utf-8")
+            try:
+                Path(name).write_text(self.result.toPlainText(), encoding="utf-8")
+            except OSError as e:
+                QMessageBox.critical(self, "Save failed", f"Could not save {Path(name).name}: {e}")

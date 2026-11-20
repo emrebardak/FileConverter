@@ -38,7 +38,7 @@ Open-source Windows desktop app that converts documents and images to PDF. It al
 
 - Windows 10 or 11
 - [LibreOffice](https://www.libreoffice.org/download/) 7.6 or newer. Only needed to convert Office files; images and summaries work without it.
-- An NVIDIA API key from [build.nvidia.com](https://build.nvidia.com). Only needed for summaries. Keys are stored in Windows Credential Manager and never shipped with the app.
+- An NVIDIA API key from [build.nvidia.com](https://build.nvidia.com). Only needed for summaries. Keys are stored in Windows Credential Manager and never shipped with the app. The free tier allows about 40 requests per minute and is intended for prototyping; every user brings their own `nvapi-…` key. The `NVIDIA_API_KEY` environment variable, when set, overrides the stored key.
 
 ## Getting started (development)
 
