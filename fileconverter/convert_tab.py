@@ -62,6 +62,9 @@ class ConvertTab(QWidget):
         # left: add / grid / page setup / status / save
         add_btn = QPushButton("Add files…")
         add_btn.clicked.connect(self._choose_files)
+        self.quick_btn = QPushButton("Quick convert…")
+        self.quick_btn.setToolTip("Convert one file straight to a PDF and choose where to save it")
+        self.quick_btn.clicked.connect(self._choose_quick)
         drop_hint = QLabel("Drop files here, or")
 
         self.grid = QListWidget()
@@ -114,6 +117,7 @@ class ConvertTab(QWidget):
         top = QHBoxLayout()
         top.addWidget(drop_hint)
         top.addWidget(add_btn)
+        top.addWidget(self.quick_btn)
         top.addStretch()
         left = QWidget()
         left_layout = QVBoxLayout(left)
@@ -157,22 +161,69 @@ class ConvertTab(QWidget):
         names, _ = QFileDialog.getOpenFileNames(self, "Add files", "", f"Supported files ({patterns})")
         self.add_files([Path(n) for n in names])
 
+    def _job(self, path: Path):
+        """(fn, args) that converts path to a PDF, or None after recording why it can't."""
+        ext = path.suffix.lower()
+        if ext in IMAGE_EXTS:
+            return images.to_pdf, (path, self.setup, self.workdir)
+        if ext in OFFICE_EXTS and office.find_soffice() is not None:
+            return office.to_pdf, (path, self.workdir)
+        missing_lo = ext in OFFICE_EXTS
+        self._set_status(path, "Failed: LibreOffice not installed" if missing_lo else "Skipped: unsupported file type")
+        return None
+
     def add_files(self, paths: list[Path]) -> None:
         lo_warned = False
         for path in paths:
-            ext = path.suffix.lower()
-            if ext in IMAGE_EXTS:
-                self._convert(path, images.to_pdf, path, self.setup, self.workdir)
-            elif ext in OFFICE_EXTS:
-                if office.find_soffice() is None:
-                    self._set_status(path, "Failed: LibreOffice not installed")
-                    if not lo_warned:
-                        self._warn_libreoffice()
-                        lo_warned = True
-                    continue
-                self._convert(path, office.to_pdf, path, self.workdir)
-            else:
-                self._set_status(path, "Skipped: unsupported file type")
+            job = self._job(path)
+            if job is not None:
+                self._convert(path, job[0], *job[1])
+            elif path.suffix.lower() in OFFICE_EXTS and not lo_warned:
+                self._warn_libreoffice()
+                lo_warned = True
+
+    # ---- quick convert: one file straight to a PDF; the grid is not touched
+
+    def _choose_quick(self) -> None:
+        patterns = " ".join(f"*{e}" for e in sorted(OFFICE_EXTS | IMAGE_EXTS))
+        name, _ = QFileDialog.getOpenFileName(self, "Quick convert", "", f"Supported files ({patterns})")
+        if name:
+            self.quick_convert(Path(name))
+
+    def quick_convert(self, src: Path) -> None:
+        """Convert src in the background, then ask where to save it (defaults to src's name as .pdf)."""
+        job = self._job(src)
+        if job is None:
+            if src.suffix.lower() in OFFICE_EXTS:
+                self._warn_libreoffice()
+            return
+        self.quick_btn.setEnabled(False)
+        self._set_status(src, "Converting…")
+        run_task(
+            job[0],
+            *job[1],
+            on_done=lambda pdf: self._quick_save(src, pdf),
+            on_failed=lambda msg: self._quick_failed(src, msg),
+        )
+
+    def _quick_failed(self, src: Path, message: str) -> None:
+        self.quick_btn.setEnabled(True)
+        self._set_status(src, f"Failed: {message}")
+        QMessageBox.warning(self, "Conversion failed", f"Could not convert {src.name}:\n{message}")
+
+    def _quick_save(self, src: Path, pdf: Path) -> None:
+        self.quick_btn.setEnabled(True)
+        out = self._ask_save_path(str(src.with_suffix(".pdf")))
+        if out is None:
+            self._set_status(src, "Cancelled")
+            return
+        try:
+            pages.save(pages.pages_of(pdf, src), out)
+        except Exception as e:
+            self._set_status(src, f"Failed: {e}")
+            QMessageBox.critical(self, "Save failed", f"Could not save {out.name}:\n{e}")
+            return
+        self._set_status(src, f"Saved to {out}")
 
     def _convert(self, origin: Path, fn, *args) -> None:
         self._set_status(origin, "Converting…")
@@ -288,17 +339,24 @@ class ConvertTab(QWidget):
 
     # ---- save
 
-    def _save(self) -> None:
-        name, _ = QFileDialog.getSaveFileName(self, "Save PDF", "output.pdf", "PDF (*.pdf)")
+    def _ask_save_path(self, suggested: str) -> Path | None:
+        """Save As dialog for a PDF; None if cancelled. Forces .pdf and confirms overwriting."""
+        name, _ = QFileDialog.getSaveFileName(self, "Save PDF", suggested, "PDF (*.pdf)")
         if not name:
-            return
+            return None
         out = Path(name)
         if out.suffix.lower() != ".pdf":
-            out = out.with_suffix(".pdf")
+            out = out.with_suffix(".pdf")  # the dialog only confirmed overwriting the typed name
             if out.exists() and QMessageBox.question(
                 self, "Overwrite?", f"{out.name} already exists. Replace it?"
             ) != QMessageBox.StandardButton.Yes:
-                return
+                return None
+        return out
+
+    def _save(self) -> None:
+        out = self._ask_save_path("output.pdf")
+        if out is None:
+            return
         try:
             pages.save(self.current_pages(), out)
         except Exception as e:
