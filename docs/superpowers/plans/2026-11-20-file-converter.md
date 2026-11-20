@@ -654,7 +654,7 @@ def test_same_stem_does_not_collide(sample_docx, sample_pptx, workdir):
 - [ ] **Step 3: Run tests to verify they fail**
 
 Run: `python -m pytest tests/test_office.py -v`
-Expected: collection error `ModuleNotFoundError: No module named 'fileconverter.office'`
+Expected: collection error `ImportError: cannot import name 'office' from 'fileconverter'`
 
 - [ ] **Step 4: Implement `fileconverter/office.py`**
 
@@ -928,7 +928,7 @@ def test_keyring_key(monkeypatch):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `python -m pytest tests/test_summarize.py -v`
-Expected: collection error `ModuleNotFoundError: No module named 'fileconverter.summarize'`
+Expected: collection error `ImportError: cannot import name 'summarize' from 'fileconverter'`
 
 - [ ] **Step 3: Implement `fileconverter/summarize.py`**
 
@@ -1843,7 +1843,7 @@ def test_failure_reenables_button(qapp, workdir, text_pdf, fake_api, monkeypatch
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `python -m pytest tests/test_summarize_tab.py -v`
-Expected: collection error `ModuleNotFoundError: No module named 'fileconverter.summarize_tab'`
+Expected: collection error `ImportError: cannot import name 'summarize_tab' from 'fileconverter'`
 
 - [ ] **Step 3: Implement `fileconverter/summarize_tab.py`**
 
@@ -2133,7 +2133,11 @@ Expected: `54 passed` (with LibreOffice installed).
 - [ ] **Step 6: Launch the app**
 
 Run: `python -m fileconverter`
-Expected: a window titled "FileConverter" with **Convert** and **Summarize** tabs. Drop a JPG on it: a thumbnail appears and the preview shows the page within about 1 s. Close the window.
+Expected: a window titled "FileConverter" with **Convert** and **Summarize** tabs. Then check by hand:
+
+1. Drop two different JPGs on it: two thumbnails appear and the preview shows both pages within about 1 s.
+2. Drag the second thumbnail in front of the first with the mouse: the labels renumber (`1 · …`, `2 · …`) and the preview order follows. The automated test only calls `moveRow`, so this is the only check that a real mouse drag works.
+3. Close the window.
 
 - [ ] **Step 7: Commit**
 
@@ -2187,13 +2191,15 @@ Get-Item dist\FileConverter.exe | Select-Object Name, @{n = "SizeMB"; e = { [mat
 Run: `.\build.ps1`
 Expected: ends with a table showing `FileConverter.exe` at about 105 MB. `build/`, `dist/` and `*.spec` are already in `.gitignore`.
 
-- [ ] **Step 3: Check the exe starts and stays open**
+- [ ] **Step 3: Check the exe opens and closes cleanly**
+
+A one-file exe runs as two processes (unpacker + app), so close it through its window, not by killing the process you started:
 
 ```powershell
-$p = Start-Process .\dist\FileConverter.exe -PassThru; Start-Sleep 12; $p.Refresh(); "alive: $(-not $p.HasExited)"; Stop-Process -Id $p.Id
+$p = Start-Process .\dist\FileConverter.exe -PassThru; Start-Sleep 12; $w = Get-Process FileConverter | Where-Object MainWindowTitle -eq "FileConverter"; "window open: $([bool]$w)"; $null = $w.CloseMainWindow(); if ($p.WaitForExit(15000)) { "exit code $($p.ExitCode)" } else { "did not exit" }
 ```
 
-Expected: `alive: True`. (Startup takes 2–5 s because one-file builds unpack to a temp folder.)
+Expected: `window open: True` then `exit code 0`. (Startup takes 2–5 s because one-file builds unpack to a temp folder.)
 
 - [ ] **Step 4: Update `README.md`**
 
@@ -2206,7 +2212,7 @@ Replace the status block:
 with:
 
 ```markdown
-> **Status: 0.1.0.** Convert, page editing, live preview and AI summaries are implemented. Download `FileConverter.exe` from the releases page or build it yourself (below).
+> **Status: 0.1.0.** Convert, page editing, live preview and AI summaries are implemented. No release has been published yet; build `FileConverter.exe` yourself (below).
 ```
 
 Rename the heading `## Features (planned)` to `## Features`. Delete the line `> These commands become valid once implementation lands.` In "Getting started (development)", change `pip install -r requirements.txt` to `pip install -r requirements-dev.txt`. After the `.\build.ps1` code block, add:
@@ -2215,7 +2221,7 @@ Rename the heading `## Features (planned)` to `## Features`. Delete the line `> 
 The result is `dist\FileConverter.exe` (about 105 MB). It contains no LibreOffice and no API key: users install LibreOffice themselves for Office files and paste their own NVIDIA key in the Summarize tab.
 ```
 
-In `## Roadmap`, change every remaining `- [ ]` to `- [x]`.
+In `## Roadmap`, tick (`- [x]`) every item except the last one, `` `.exe` build and first release ``: publishing a release is the maintainer's decision and not part of this plan.
 
 - [ ] **Step 5: Run the manual GUI checklist**
 
@@ -2236,5 +2242,6 @@ Checked on 2026-11-20 before writing this plan, against the exact pins above (Wi
 
 - Every code block in this plan was extracted into an empty directory and the test suite was run task by task. Each task's tests failed before its implementation and passed after it.
 - Full suite: 51 passed, 3 skipped (the 3 LibreOffice conversion tests; LibreOffice was not installed on the planning machine, so `office.to_pdf` has **not** been run yet; Task 4 Step 1 closes that).
+- Not verified yet, and covered by the plan's own steps: Office conversion with a real LibreOffice (Task 4 Step 1), reordering by mouse drag (Task 9 Step 6), and the 10-item manual GUI checklist (Task 10 Step 5).
 - Live NVIDIA call: both models returned a correct one-sentence summary (about 10 s for both).
 - `build.ps1` produced a 104 MB `FileConverter.exe` that started and stayed open; a console build of the same flags confirmed MarkItDown text extraction and the Windows keyring backend work inside the frozen exe.
