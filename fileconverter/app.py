@@ -27,7 +27,11 @@ class MainWindow(QMainWindow):
         self.statusBar()
 
     def closeEvent(self, event):
-        QThreadPool.globalInstance().waitForDone(3000)
+        # Hide first so closing feels instant, then let running conversions and
+        # summaries finish (LibreOffice can take up to its 120 s timeout) before
+        # deleting the session folder; otherwise they recreate files in it.
+        self.hide()
+        QThreadPool.globalInstance().waitForDone()
         shutil.rmtree(self.workdir, ignore_errors=True)
         super().closeEvent(event)
 
