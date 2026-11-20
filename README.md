@@ -2,7 +2,7 @@
 
 Open-source Windows desktop app that converts documents and images to PDF. It also lets you edit the result with a live preview and summarize documents with AI.
 
-> **Status: 0.1.0.** Convert, page editing, live preview and AI summaries are implemented. Download `FileConverter.exe` from [Releases](https://github.com/emrebardak/FileConverter/releases/latest), or build it yourself (below).
+> **Status: 0.1.1.** Convert, quick convert, page editing, live preview and AI summaries are implemented. Download `FileConverter.exe` from [Releases](https://github.com/emrebardak/FileConverter/releases/latest), or build it yourself (below).
 
 ## Features
 
@@ -11,6 +11,7 @@ Open-source Windows desktop app that converts documents and images to PDF. It al
   - Word: DOC, DOCX, ODT, RTF
   - Excel: XLS, XLSX, ODS
   - Images: JPG, PNG, BMP, TIFF, WEBP, GIF
+- **Quick convert.** Pick one file and save it straight as a PDF with the same name, no page editing needed.
 - **Customize the PDF**
   - Page size, orientation and margins for images
   - Merge many files into one PDF

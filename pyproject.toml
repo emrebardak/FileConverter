@@ -1,6 +1,6 @@
 [project]
 name = "fileconverter"
-version = "0.1.0"
+version = "0.1.1"
 description = "Convert Office documents and images to PDF, edit pages with live preview, and summarize documents with AI."
 license = "MIT"
 requires-python = ">=3.12"
