@@ -77,11 +77,12 @@ docs/            design specs and implementation plans
 ## Documentation
 
 - [Design spec](docs/superpowers/specs/2026-11-20-file-converter-design.md): architecture, components, data flow, error handling, testing, packaging.
+- [Implementation plan](docs/superpowers/plans/2026-11-20-file-converter.md): ten test-first tasks with complete code.
 
 ## Roadmap
 
 - [x] Design spec
-- [ ] Implementation plan
+- [x] Implementation plan
 - [ ] Image to PDF with page setup
 - [ ] Office to PDF via LibreOffice
 - [ ] Page grid: merge, reorder, delete

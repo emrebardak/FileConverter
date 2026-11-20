@@ -53,19 +53,23 @@ FileConverter/
     images.py       # image -> PDF with page setup
     pages.py        # page model, thumbnails, assemble PDF bytes, save
     summarize.py    # file -> Markdown -> NVIDIA API -> summary
-    app.py          # Qt main window (the only module that imports Qt)
+    workers.py      # run_task(): QThreadPool worker, results back on the UI thread
+    preview.py      # PdfPreview widget: QPdfView loaded from memory
+    convert_tab.py  # Convert tab: grid, page setup, status, save
+    summarize_tab.py# Summarize tab
+    app.py          # main window and main()
   tests/
-    fixtures/       # tiny sample.docx, sample.pptx, sample.jpg, sample.png, sample.pdf
-    test_images.py
-    test_pages.py
-    test_office.py
-    test_summarize.py
+    conftest.py     # generates tiny fixture files (docx, pptx, png, jpg, pdf) per test
+    qt_helpers.py   # headless qapp fixture and settle() for GUI tests
+    test_images.py  test_pages.py  test_office.py  test_summarize.py
+    test_preview.py test_convert_tab.py test_summarize_tab.py test_app.py
   requirements.txt
+  requirements-dev.txt
   build.ps1         # PyInstaller one-file build
   README.md         # how to run, install LibreOffice, get an NVIDIA key
 ```
 
-Rule: `office.py`, `images.py`, `pages.py`, and `summarize.py` never import Qt. They are plain functions, testable without a GUI.
+Rule: `office.py`, `images.py`, `pages.py`, and `summarize.py` never import Qt. They are plain functions, testable without a GUI. Only the five GUI modules import Qt; each one is small enough to review on its own.
 
 ## 4. Components
 
@@ -136,7 +140,7 @@ SUMMARY_EXTS = {".pdf", ".docx", ".pptx"}
 Style = Literal["Short", "Detailed", "Bullets"]
 
 def extract_markdown(src: Path) -> str
-def chunk(text: str, max_chars: int = 40_000) -> list[str]
+def chunk(text: str, max_chars: int = 100_000) -> list[str]
 def summarize(text: str, style: Style, api_key: str, model: str) -> str
 def get_api_key() -> str | None
 def set_api_key(key: str) -> None
@@ -153,13 +157,18 @@ def set_api_key(key: str) -> None
   - Detailed: "Summarize the document in several paragraphs covering every main section."
   - Bullets: "Summarize the document as 5–10 concise bullet points."
   - All three add: "Use only information from the document. Reply in the document's language."
-- Default model: `meta/llama-3.3-70b-instruct`. The implementer confirms it is still listed on build.nvidia.com. If it is not, the implementer picks a current instruct model with at least a 32k context and updates this default. The model is an editable setting in the UI.
+- Model choice (checked 2026-11-20 against the live list at `GET https://integrate.api.nvidia.com/v1/models`):
+  - **Default: `nvidia/nemotron-3-ultra-550b-a55b`.** NVIDIA's own flagship, so it is the least likely to vanish from the catalog. Its 1M-token context means almost any document fits in one request, which matters under the 40 requests/minute limit. It is a 55B-active MoE, so it is fast for its quality.
+  - **Fast alternative: `nvidia/nemotron-3.5-lightning-30b-a3b`.** A small 3B-active MoE for quick summaries.
+  - Rejected: `moonshotai/kimi-k3.1-pro` and `mistralai/mistral-large-4-1t-a52b` (larger and slower, with no gain for summaries); `nvidia/nemotron-3.5-super-vl-120b-a12b` (early access); Gemma, GLM and MiniMax "flash" models (third-party, so they are more likely to rotate out).
+  - The UI offers both models in an editable combo box, so users can type any other model ID from the catalog.
+- Model output: reasoning models may wrap their thinking in `<think>…</think>`. `summarize` strips any such block before returning.
 - API key: `get_api_key()` returns the `NVIDIA_API_KEY` env var if set, else `keyring.get_password("FileConverter", "nvidia")`. `set_api_key` stores the key with keyring. The key is never written to disk in plain text, never logged, and never bundled.
 - Errors map to typed exceptions: HTTP 401/403 to `BadApiKey`, 429 to `RateLimited`, `URLError` / timeout to `Offline`, any other HTTP error to `ApiError(status, body)`.
 
 Free-tier notes for the README: about 40 requests/minute, intended for prototyping, and every user brings their own `nvapi-…` key from build.nvidia.com.
 
-### 4.5 `app.py` (GUI)
+### 4.5 GUI (`workers.py`, `preview.py`, `convert_tab.py`, `summarize_tab.py`, `app.py`)
 
 Main window with two tabs.
 
@@ -167,7 +176,7 @@ Main window with two tabs.
 
 - **Left side**
   - Drop zone and "Add files…" button. The button accepts every extension in `OFFICE_EXTS | IMAGE_EXTS`.
-  - Thumbnail grid: `QListWidget` in `IconMode` with `InternalMove` drag-drop. Each item stores its `Page`.
+  - Thumbnail grid: `QListWidget` in `ListMode` with left-to-right wrapping flow (looks like an icon grid) and `InternalMove` drag-drop. `IconMode` was rejected because its free-move reordering is unreliable. Each item stores an integer page id that maps to its `Page`.
   - Under each thumbnail: page number plus source file name. A colour tag marks each origin file.
   - Delete key removes the selected pages. Multi-select uses Ctrl/Shift.
   - Page setup panel: Size combo (A4/Letter/Fit), Orientation combo (Auto/Portrait/Landscape), Margin spin box (0–50 mm).
@@ -230,7 +239,7 @@ No error ever stops other files that are in progress. No error discards the user
 
 ## 7. Testing
 
-pytest, run with `python -m pytest`. Fixtures are tiny files in `tests/fixtures/`, generated by a helper script or committed directly.
+pytest, run with `python -m pytest`. Fixture files are generated per test by `tests/conftest.py`, so the repo holds no binary fixtures. GUI tests run headless (`QT_QPA_PLATFORM=offscreen`).
 
 - `test_images.py`
   - A4 portrait gives a page of 595×842 pt (±1).
@@ -273,8 +282,9 @@ pytest, run with `python -m pytest`. Fixtures are tiny files in `tests/fixtures/
 `build.ps1`:
 
 ```powershell
-python -m PyInstaller --noconfirm --onefile --windowed --name FileConverter `
+python -m PyInstaller --noconfirm --clean --onefile --windowed --name FileConverter `
   --collect-all pypdfium2 `
+  --collect-all pypdfium2_raw `
   --collect-all magika `
   --collect-all markitdown `
   --collect-binaries onnxruntime `
@@ -283,7 +293,7 @@ python -m PyInstaller --noconfirm --onefile --windowed --name FileConverter `
 ```
 
 - PyInstaller's PySide6 hooks include `QtPdf` / `QtPdfWidgets` once `app.py` imports them. Verify that the built `.exe` shows the preview.
-- Expected size is about 150 MB. Expected startup is 2–5 s, because onefile unpacks to a temp folder.
+- Measured size: 104 MB (PyInstaller 6.22.3, 2026-11-20). Expected startup is 2–5 s, because onefile unpacks to a temp folder.
 - The `.exe` contains **no** LibreOffice and **no** API key. The README tells users to install LibreOffice for Office files and to paste their own NVIDIA key.
 - If a collect flag proves unnecessary or another one is missing, adjust `build.ps1` and note why in a comment.
 
