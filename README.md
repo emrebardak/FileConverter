@@ -2,9 +2,9 @@
 
 Open-source Windows desktop app that converts documents and images to PDF. It also lets you edit the result with a live preview and summarize documents with AI.
 
-> **Status: design phase.** The design spec is approved. Implementation has not started yet. See the [roadmap](#roadmap).
+> **Status: 0.1.0.** Convert, page editing, live preview and AI summaries are implemented. No release has been published yet; build `FileConverter.exe` yourself (below).
 
-## Features (planned)
+## Features
 
 - **Convert to PDF**
   - PowerPoint: PPT, PPTX, ODP
@@ -47,7 +47,7 @@ git clone https://github.com/emrebardak/FileConverter.git
 cd FileConverter
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 python -m fileconverter
 ```
 
@@ -63,7 +63,7 @@ Build the `.exe`:
 .\build.ps1
 ```
 
-> These commands become valid once implementation lands.
+The result is `dist\FileConverter.exe` (about 105 MB). It contains no LibreOffice and no API key: users install LibreOffice themselves for Office files and paste their own NVIDIA key in the Summarize tab.
 
 ## Project layout
 
@@ -83,11 +83,11 @@ docs/            design specs and implementation plans
 
 - [x] Design spec
 - [x] Implementation plan
-- [ ] Image to PDF with page setup
-- [ ] Office to PDF via LibreOffice
-- [ ] Page grid: merge, reorder, delete
-- [ ] Live PDF preview
-- [ ] AI summarizer
+- [x] Image to PDF with page setup
+- [x] Office to PDF via LibreOffice
+- [x] Page grid: merge, reorder, delete
+- [x] Live PDF preview
+- [x] AI summarizer
 - [ ] `.exe` build and first release
 
 ## Contributing
