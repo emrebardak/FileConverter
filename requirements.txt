@@ -1,0 +1,6 @@
+PySide6==6.12.0
+pypdf==7.1.1
+pypdfium2==5.15.2
+pillow==13.0.0
+markitdown[pdf,docx,pptx]==0.1.9
+keyring==25.7.0
